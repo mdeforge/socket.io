@@ -4,7 +4,7 @@
 //  Created by Melo Yao on 3/22/15.
 //
 
-#include "sio_packet.h"
+#include "SocketIO/Internal/sio_packet.h"
 #include <rapidjson/document.h>
 #include <rapidjson/encodedstream.h>
 #include <rapidjson/writer.h>

@@ -4,8 +4,8 @@
 //  Created by Melo Yao on 3/25/15.
 //
 
-#include "sio_client.h"
-#include "internal/sio_client_impl.h"
+#include "SocketIO/sio_client.h"
+#include "SocketIO/Internal/sio_client_impl.h"
 
 using namespace websocketpp;
 using std::stringstream;

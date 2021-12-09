@@ -31,6 +31,7 @@ By virtue of being written in C++, this client works in several different platfo
 
 ## Features
 
+- Sane, modern, CMakeLists file (New!)
 - 100% written in modern C++11
 - Binary support
 - Automatic JSON encoding

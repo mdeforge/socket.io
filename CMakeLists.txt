@@ -1,101 +1,128 @@
-cmake_minimum_required(VERSION 3.4 FATAL_ERROR)
-PROJECT(sioclient)
+#
+# Preamble
+#
 
-option(BUILD_SHARED_LIBS "Build the shared library" OFF)
-option(BUILD_UNIT_TESTS  "Builds unit tests target" OFF)
+cmake_minimum_required(VERSION 3.15)
+project(SocketIO VERSION 1.6.0 LANGUAGES CXX)
 
-set(MAJOR 1)
-set(MINOR 6)
-set(PATCH 0)
+#
+# Create Target
+#
 
-if(NOT CMAKE_BUILD_TYPE )
-MESSAGE(STATUS "not define build type, set to release" )
-set(CMAKE_BUILD_TYPE Release )
-elseif(NOT (${CMAKE_BUILD_TYPE} STREQUAL "Release" OR ${CMAKE_BUILD_TYPE} STREQUAL "Debug" ))
-MESSAGE(SEND_ERROR "CMAKE_BUILD_TYPE must be either Release or Debug")
-return()
-endif()
+# Add the library
+add_library (SocketIO STATIC)
+add_library(SocketIO::SocketIO ALIAS SocketIO)
 
-aux_source_directory(${CMAKE_CURRENT_LIST_DIR}/src ALL_SRC)
-aux_source_directory(${CMAKE_CURRENT_LIST_DIR}/src/internal ALL_SRC)
-file(GLOB ALL_HEADERS ${CMAKE_CURRENT_LIST_DIR}/src/*.h )
-set(SIO_INCLUDEDIR ${CMAKE_CURRENT_LIST_DIR})
+# Add sources to target
+target_sources(SocketIO
+	PRIVATE
+		include/SocketIO/sio_client.h
+		include/SocketIO/sio_message.h
+		include/SocketIO/sio_socket.h
+        include/SocketIO/Internal/sio_client_impl.h
+        include/SocketIO/Internal/sio_packet.h
+        src/internal/sio_client_impl.cpp
+        src/internal/sio_packet.cpp
+        src/sio_client.cpp
+        src/sio_socket.cpp
+)
 
-add_definitions(
+# Postfix debug files
+set_target_properties(SocketIO PROPERTIES DEBUG_POSTFIX "d")
+
+#
+# Usage Requirements
+#
+
+# Add compiler features and definitions
+target_compile_features(SocketIO PRIVATE cxx_std_11)
+target_compile_definitions(SocketIO PRIVATE
     # These will force ASIO to compile without Boost
-    -DBOOST_DATE_TIME_NO_LIB
-    -DBOOST_REGEX_NO_LIB
-    -DASIO_STANDALONE
+    BOOST_DATE_TIME_NO_LIB
+    BOOST_REGEX_NO_LIB
+    ASIO_STANDALONE
     # These will force WebsocketPP to compile with C++11
-    -D_WEBSOCKETPP_CPP11_STL_
-    -D_WEBSOCKETPP_CPP11_FUNCTIONAL_
+    _WEBSOCKETPP_CPP11_STL_
+    _WEBSOCKETPP_CPP11_FUNCTIONAL_
 )
 
-add_library(sioclient ${ALL_SRC})
-target_include_directories(sioclient PRIVATE 
-    ${CMAKE_CURRENT_LIST_DIR}/src 
-    ${CMAKE_CURRENT_LIST_DIR}/lib/websocketpp 
-    ${CMAKE_CURRENT_LIST_DIR}/lib/rapidjson/include
-    ${CMAKE_CURRENT_LIST_DIR}/lib/asio/asio/include
+# Specify include directories to use when compiling a given target
+target_include_directories(SocketIO
+	PUBLIC
+		$<INSTALL_INTERFACE:include>
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+	PRIVATE
+		${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/lib/websocketpp 
+        ${CMAKE_CURRENT_SOURCE_DIR}/lib/rapidjson/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/lib/asio/asio/include
 )
 
-if (CMAKE_VERSION VERSION_GREATER "3.1")
-set_property(TARGET sioclient PROPERTY CXX_STANDARD 11)
-set_property(TARGET sioclient PROPERTY CXX_STANDARD_REQUIRED ON)
-else()
-set_property(TARGET sioclient APPEND_STRING PROPERTY COMPILE_FLAGS "-std=c++11")
-endif()
-if(BUILD_SHARED_LIBS)
-set_target_properties(sioclient
-	PROPERTIES
-		SOVERSION ${MAJOR}
-		VERSION ${MAJOR}.${MINOR}.${PATCH}
-	)
-endif()
-list(APPEND TARGET_LIBRARIES sioclient)
+# Link dependencies (None)
 
-find_package(OpenSSL)
-if(OPENSSL_FOUND)
-add_library(sioclient_tls ${ALL_SRC})
-target_include_directories(sioclient_tls PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/src 
-    ${CMAKE_CURRENT_LIST_DIR}/lib/websocketpp 
-    ${CMAKE_CURRENT_LIST_DIR}/lib/rapidjson/include
-    ${CMAKE_CURRENT_LIST_DIR}/lib/asio/asio/include
-    ${OPENSSL_INCLUDE_DIR}
-)
+#
+# Install and Export
+#
 
-if (CMAKE_VERSION VERSION_GREATER "3.1")
-set_property(TARGET sioclient_tls PROPERTY CXX_STANDARD 11)
-set_property(TARGET sioclient_tls PROPERTY CXX_STANDARD_REQUIRED ON)
-target_link_libraries(sioclient_tls PRIVATE ${OPENSSL_LIBRARIES} )
-else()
-set_property(TARGET sioclient_tls APPEND_STRING PROPERTY COMPILE_FLAGS "-std=c++11")
-endif()
-target_compile_definitions(sioclient_tls PRIVATE -DSIO_TLS)
-if(BUILD_SHARED_LIBS)
-set_target_properties(sioclient_tls
-	PROPERTIES
-		SOVERSION ${MAJOR}
-		VERSION ${MAJOR}.${MINOR}.${PATCH}
-	)
-endif()
-list(APPEND TARGET_LIBRARIES sioclient_tls)
+# Set the install destination for cmake files
+set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/SocketIO)
 
-endif()
-
+# Install include directory
 include(GNUInstallDirs)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-install(FILES ${ALL_HEADERS} 
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+# Specify the name of the export set the targets belong to
+install(TARGETS SocketIO
+	EXPORT SocketIOTargets
+	ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/$<CONFIG>
+	LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/$<CONFIG>
+	RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/$<CONFIG>
+	INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(TARGETS ${TARGET_LIBRARIES}
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}
+# Export the targets to a script
+install(EXPORT SocketIOTargets
+	FILE SocketIOTargets.cmake
+	NAMESPACE SocketIO::
+	DESTINATION ${INSTALL_CONFIGDIR}
 )
 
-if(BUILD_UNIT_TESTS)
-message(STATUS "Building with unit test support.")
-enable_testing()
-add_subdirectory(test)
-endif()
+# Generate a config file that includes the exports
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+	${CMAKE_CURRENT_LIST_DIR}/cmake/SocketIOConfig.cmake.in
+	${CMAKE_CURRENT_BINARY_DIR}/cmake/SocketIOConfig.cmake
+	INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
+	NO_SET_AND_CHECK_MACRO
+	NO_CHECK_REQUIRED_COMPONENTS_MACRO
+)
+
+# Generate the version file for the config file
+write_basic_package_version_file(
+	${CMAKE_CURRENT_BINARY_DIR}/cmake/SocketIOConfigVersion.cmake
+	VERSION ${PROJECT_VERSION}
+	COMPATIBILITY SameMajorVersion
+)
+
+# Install the Config, ConfigVersion and custom Find Module
+install(FILES
+	#${CMAKE_CURRENT_LIST_DIR}/FindSocketIO.cmake
+	${CMAKE_CURRENT_BINARY_DIR}/cmake/SocketIOConfig.cmake
+	${CMAKE_CURRENT_BINARY_DIR}/cmake/SocketIOConfigVersion.cmake
+	DESTINATION ${INSTALL_CONFIGDIR}
+)
+
+# Make this project available from the build directory
+export(EXPORT SocketIOTargets
+	FILE ${CMAKE_CURRENT_BINARY_DIR}/SocketIOTargets.cmake
+	NAMESPACE SocketIO::
+)
+
+#
+# Testing
+#
+
+#if(BUILD_TESTS)
+#	enable_testing()
+#	add_subdirectory(test)
+#endif()
